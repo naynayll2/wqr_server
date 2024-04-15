@@ -2,7 +2,6 @@ version: '3.4'
 
 services:
   wqrhttps:
-    image: wqrhttps
     build:
       context: .
       dockerfile: ./Dockerfile
@@ -14,6 +13,7 @@ services:
       COLLECTION: timeseries
     ports:
       - 3000:3000
+    restart: always
   mongo:
     container_name: wqr_database
     image: mongodb/mongodb-community-server
@@ -21,3 +21,4 @@ services:
       NODE_ENV: production
     ports:
       - 27017:27017
+    restart: always
