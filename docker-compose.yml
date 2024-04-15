@@ -1,0 +1,23 @@
+version: '3.4'
+
+services:
+  wqrhttps:
+    image: wqrhttps
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      MONGO_URI: mongodb://mongo:27017
+      DB: wqr
+      COLLECTION: timeseries
+    ports:
+      - 3000:3000
+  mongo:
+    container_name: wqr_database
+    image: mongodb/mongodb-community-server
+    environment:
+      NODE_ENV: production
+    ports:
+      - 27017:27017
