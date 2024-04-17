@@ -12,7 +12,18 @@ const client = new MongoClient(URI, {
   pkFactory:{createPk: () => new UUID().toBinary()}
 })
 
-const wqrCollection = client.db(DB).collection(COLLECTION)
+const db = client.db(DB)
+
+db.createCollection('wqr', {
+  timeseries: {
+    timeField: 'timestamp',
+    metaField: 'robotID'
+  }
+}).catch((r) => {
+  console.log(`Failed with error ${r}`)
+})
+
+const wqrCollection = db.collection('wqr')
 
 async function batchAddToWQR(timeseries: Array<{[key: string]: any}>): Promise<boolean> {
   const results = await wqrCollection.insertMany(timeseries)
@@ -85,8 +96,20 @@ app.post("/api/data/", async (req: Request, res: Response) => {
   }
 })
 
-app.get("/api/data/", (req: Request, res: Response) => {
+app.get("/api/data/", async (req: Request, res: Response) => {
+  if (req.body.operation === "GetAllLakeNames") {
+    const names = await wqrCollection.distinct("robotID")
+    res.status(200).send(names)
+  } else if (req.body.operation === "GetAllLakeData") {
+    const startTime = req.body.startTime
+    const endTime = req.body.endTime
 
+    
+  } else if (req.body.operation === "GetAllLakeHistory") {
+
+  } else {// No defined API, reject
+
+  }
 })
 
 app.listen(port, () => {
