@@ -1,6 +1,7 @@
 import express, {Express, Request, Response} from "express"
-import { MongoClient } from "mongodb"
-import { UUID, Timestamp } from "bson"
+import { MongoClient, Timestamp, Document } from "mongodb"
+import { UUID } from "bson"
+import { start } from "repl"
 
 const app = express()
 const port = process.env.PORT!!
@@ -14,7 +15,7 @@ const client = new MongoClient(URI, {
 
 const db = client.db(DB)
 
-db.createCollection('wqr', {
+db.createCollection(COLLECTION, {
   timeseries: {
     timeField: 'timestamp',
     metaField: 'robotID'
@@ -23,25 +24,18 @@ db.createCollection('wqr', {
   console.log(`Failed with error ${r}`)
 })
 
-const wqrCollection = db.collection('wqr')
+const wqrCollection = db.collection(COLLECTION)
 
 async function batchAddToWQR(timeseries: Array<{[key: string]: any}>): Promise<boolean> {
-  const results = await wqrCollection.insertMany(timeseries)
-  return new Promise((resolve, reject) => {
-    try{
-      console.log("Inserting into database")
-      console.log(results)
-      if (results.acknowledged && results.insertedCount === timeseries.length) {
-        console.log("Submitted succesfully")
-        resolve(true)
-      } else {
-        console.log(`Failure in submission: Acknowledged=${results.acknowledged}` +
-          `given=${timeseries.length} submitted=${timeseries.length}`)
-        resolve(false)
-      }
-    } catch {
-      resolve(false)
+  console.log("Inserting into database")
+  return wqrCollection.insertMany(timeseries).then((results) => {
+    if (results.acknowledged && results.insertedCount === timeseries.length) {
+      console.log("Submitted succesfully")
     }
+    return true
+  }, (error) => {
+    console.log(error)
+    return false
   })
 }
 
@@ -77,13 +71,13 @@ app.post("/api/data/", async (req: Request, res: Response) => {
       let tempEntry: {[key: string]: any} = {}
       for (let [key, value] of Object.entries(req.body)) {
           let curVal = (value as Array<string|number>|String)[i]
-          if (key === "robotID") {
-            curVal = value as string
-          }
           if (key === "timestamp") {
-            value = new Timestamp(BigInt(curVal))
+            tempEntry[key] = new Date(Number(curVal) * 1000)
+          } else if (key === "robotID") {
+            tempEntry["metadata"] = { 'robotID' : value }
+          } else {
+            tempEntry[key] = curVal
           }
-          tempEntry[key] = curVal
       }
       timeseries.push(tempEntry)
     }
@@ -92,6 +86,8 @@ app.post("/api/data/", async (req: Request, res: Response) => {
     if (status) {
       console.log("Done now")
       res.status(200).send("OK")
+    } else {
+      res.status(400).send("Server Error")
     }
   }
 })
@@ -101,14 +97,43 @@ app.get("/api/data/", async (req: Request, res: Response) => {
     const names = await wqrCollection.distinct("robotID")
     res.status(200).send(names)
   } else if (req.body.operation === "GetAllLakeData") {
+    const pipeline = [
+      {
+        $sort: {timestamp: -1}
+      }, 
+      {
+        $group: {
+          _id: '$metadata.robotID',
+          latestDocument: {
+            $first: '$$ROOT'
+          }
+        }
+      }
+    ]
+
+    const keysToFilter = ['_id', 'metadata']
+    let results = await wqrCollection.aggregate(pipeline).toArray()
+
+    results = results.reduce((accum: Array<Document>, currentValue: Document): Array<Document> => {
+      accum.push({
+        robotID: currentValue._id,
+        ...Object.fromEntries(Object.entries(currentValue.latestDocument).filter(
+          ([k,v]) => !(keysToFilter.includes(k))
+        ))
+      })
+      return accum
+    }, new Array<Document>())
+    
+    console.log(results)
+    res.status(200).send(results)
+  } else if (req.body.operation === "GetAllLakeHistory") {
     const startTime = req.body.startTime
     const endTime = req.body.endTime
 
-    
-  } else if (req.body.operation === "GetAllLakeHistory") {
-
+    if (startTime === undefined || endTime === undefined) {
+      res.status(400).send("JSON body must have 'startTime' and 'endTime' set to valid ISO timestamps")
+    }
   } else {// No defined API, reject
-
   }
 })
 
