@@ -60,7 +60,7 @@ app.post("/api/data/", async (req: Request, res: Response) => {
       return
     }
 
-    const lakeName = lakeData[0].robotID as string
+    const lakeName = lakeData[0].lakeName as string
 
     for (let [key, value] of Object.entries(req.body)) {
       if (key === "robotID") {
