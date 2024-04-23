@@ -149,16 +149,15 @@ app.get("/api/data/", async (req: Request, res: Response) => {
     if (startTime === undefined || endTime === undefined) {
       res.status(400).send("JSON body must have 'startTime' and 'endTime' set to valid ISO timestamps")
     } else {
+      const lakeData = await lakeNameCollection.findOne({lakeName: { $eq: req.body.lakeName}})
       const query = {
-        metadata: {robotID: req.body.robotID},
+        metadata: {robotID: lakeData?.robotID},
         timestamp: {
           $gte: new Date(startTime), 
           $lte: new Date(endTime)
         }
       }
-
-      const lakeData = await lakeNameCollection.findOne({robotID: { $eq: req.body.robotID}})
-
+      
       if (lakeData === undefined) {
         res.status(400).send("Cannot find lake associated with robotID. Send PUT mapping robotID to lakeName")
         return
