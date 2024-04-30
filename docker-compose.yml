@@ -11,6 +11,7 @@ services:
       MONGO_URI: mongodb://mongo:27017
       DB: wqr
       COLLECTION: timeseries
+      LAKE_NAME_COLLECTION: lake_names
     ports:
       - 3000:3000
     restart: always
