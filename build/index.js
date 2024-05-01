@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -23,32 +14,36 @@ const COLLECTION = process.env.COLLECTION;
 const client = new mongodb_1.MongoClient(URI, {
     pkFactory: { createPk: () => new bson_1.UUID().toBinary() }
 });
-const wqrCollection = client.db(DB).collection(COLLECTION);
-function batchAddToWQR(timeseries) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const results = yield wqrCollection.insertMany(timeseries);
-        return new Promise((resolve, reject) => {
-            try {
-                console.log("Inserting into database");
-                console.log(results);
-                if (results.acknowledged && results.insertedCount === timeseries.length) {
-                    console.log("Submitted succesfully");
-                    resolve(true);
-                }
-                else {
-                    console.log(`Failure in submission: Acknowledged=${results.acknowledged}` +
-                        `given=${timeseries.length} submitted=${timeseries.length}`);
-                    resolve(false);
-                }
+const db = client.db(DB);
+const wqrCollection = await db.createCollection('wqr', {
+    timeseries: {
+        timeField: 'timestamp',
+        metaField: 'robotID'
+    }
+});
+async function batchAddToWQR(timeseries) {
+    const results = await wqrCollection.insertMany(timeseries);
+    return new Promise((resolve, reject) => {
+        try {
+            console.log("Inserting into database");
+            console.log(results);
+            if (results.acknowledged && results.insertedCount === timeseries.length) {
+                console.log("Submitted succesfully");
+                resolve(true);
             }
-            catch (_a) {
+            else {
+                console.log(`Failure in submission: Acknowledged=${results.acknowledged}` +
+                    `given=${timeseries.length} submitted=${timeseries.length}`);
                 resolve(false);
             }
-        });
+        }
+        catch {
+            resolve(false);
+        }
     });
 }
 app.use(express_1.default.json());
-app.post("/api/data/", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+app.post("/api/data/", async (req, res) => {
     console.log(req.body);
     if (req.body["robotID"] === undefined) {
         res.status(400).send("Must have 'robotID' set");
@@ -89,14 +84,22 @@ app.post("/api/data/", (req, res) => __awaiter(void 0, void 0, void 0, function*
             timeseries.push(tempEntry);
         }
         console.log(timeseries);
-        const status = yield batchAddToWQR(timeseries);
+        const status = await batchAddToWQR(timeseries);
         if (status) {
             console.log("Done now");
             res.status(200).send("OK");
         }
     }
-}));
+});
 app.get("/api/data/", (req, res) => {
+    if (req.body.operation === "GetAllLakeNames") {
+    }
+    else if (req.body.operation === "GetAllLakeData") {
+    }
+    else if (req.body.operation === "GetAllLakeHistory") {
+    }
+    else { // No defined API, reject
+    }
 });
 app.listen(port, () => {
     console.log(`Active on ${port} ${DB} ${COLLECTION}`);
